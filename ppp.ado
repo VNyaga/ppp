@@ -359,9 +359,10 @@ qui {
 		`vertikal'	
 		,  		
 		ytitle("Post-test Probability (%)", axis(1) placement(0))
-		ytitle("Pre-test Probability (%)", axis(2)  placement(9) )
-		graphregion(color(white) margin(l=1 r=4)) 
+		ytitle("Pre-test Probability (%)", axis(2)  placement(9)  margin(l=-5 r=3))
+		graphregion(color(white) margin(l=5 r=8)) 
 		xscale(range(-4 `maxx')) legend(`legendopts') `options' xsize(`xsize') ysize(`ysize') 
+		
 		; 
 	#delimit cr 
 }
