@@ -1,135 +1,171 @@
 {smcl}
-{* 8 May 2017}{...}
+{* 25 Aug 2025}{...}
 {hline}
 {cmd:help ppp}
 {hline}
 
-{title: Pre- and post-probability given the diagnostic accuracy of a test}
+{title:Title}
+{pstd}
+{cmd:ppp} — Plot pre- and post-test probabilities after diagnostic testing
 
-{p 4 12 2}
-{cmd:ppp}
-{arguments}
-[{cmd:,}
-{it:legendopts(on|off|all|options)}
-{it:options}
-]
+{title:Syntax}
+{p 8 12 2}
+{cmd:ppp} prevalence LR+ LR−
+[{cmd:,} {it:options}] 
+
+{p 8 12 2}
+or 
+
+{p 8 12 2}
+{cmd:ppp} prevalence sensitivity specificity
+[{cmd:, nolr} {it:options}] 
 
 {title:Description}
+{pstd}
+{cmd:ppp} is an immediate command to plot a nomogram-like graph showing how 
+pre-test probability evolves to post-test probability after one or more 
+diagnostic tests. The method is based on Bayes’ theorem and is similar in spirit to the 
+{help fagan} plot, but allows sequential tests (“triages”).
+
+{pstd}
+The {cmd:ppp} command requires Stata 10.1 or later versions.
+
+{pstd}
+The first three arguments are; 
 
 {p 12 12  2}
-ppp is an immediate command to plot a nomogram showing evolution of probabilities pre- and post testing. 
-The command requires a minimum of three and maximum of 15 arguments. By defualt, the program uses the likelihood ratios
-to compute the post-probabilities. If the sensitivity and specificity are available, they can be used with the option {it:nolr}.
-The first three are; 
-prevalence - The prior/pre-test probability,
-lrp - The likelihood ratio for positive results,
-lrn - The likelihood ratio for negative results.
+prevalence - The prior/pre-test probability (between 0 and 1),
 
 {p 12 12  2}
-In case of a second triage, two to four more arguments are required. If both positive and the negative results have triage based on the same test then,
-
-{p 16 16  2}
-lrp2 - The likelihood ratio for positive results of the second test, and
-
-{p 16 16  2}
-lrn2 - The likelihood ratio for negative results of the second test are required.
+lrp - The likelihood ratio for positive results (values >0),
 
 {p 12 12  2}
-However, if the second triage is done based on different tests for positive and negative results then,
+lrn - The likelihood ratio for negative results (values >0).
 
-{p 16 16  2}
-lrp2 - The likelihood ratio for positive results of the second test for the first positives and
+{pstd}
+or alternatively with the option {cmd:nolr};
 
-{p 16 16  2}
-lrn2 - The likelihood ratio for negative results of the second test for the first positives are required.
+{p 12 12  2}
+prevalence - The prior/pre-test probability (between 0 and 1),
 
-{p 16 16  2}
-lrp3 - The likelihood ratio for positive results of the second test for the first negatives, and
+{p 12 12  2}
+sensitivity - The diagnostic sensitivity of a the test (between 0 and 1),
 
-{p 16 16  2}
-lrn3 - The likelihood ratio for negative results of the second test for the first negatives are required.
+{p 12 12  2}
+specificity - The diagnostic specificity of a the test (between 0 and 1).
 
-{p 16 16  2}
-In this case, {cmd: lrp2 lrn2},{cmd: lrp3 lrn3} are likelihood ratio for the first positive outcomes and negative outcomes respectively.
-When second triage is done only on positive or negative outcomes, then the likelihood ratio parameters for the missing test should be set to 1
-as follows, {cmd: lrp2 lrn2}{cmd: 1 1} or {cmd: 1 1}{cmd: lrp3 lrn3} respectively. When the {nolr} option is on, the missing test parameters are 
-set to 0.5.
+{pstd}
+For each consequent triage, two to four more arguments are required in the following order {cmd: lrp2+ lrn2+ lrp2- lrn2-} where
 
-{p 12 12 2}
-Therefore {arguments} may be {cmd: prev lrp lrn} for one triage, {cmd: prev lrp1 lrn1 lrp2 lrn2} or {cmd: prev lrp1 lrn1 lrp2 lrn2 lrp3 lrn3} for two triages.
+{p 12 12  2}
+lrp2+: - The likelihood ratio for positive results of the next test for the previous positives.
 
-{p 12 12 2}
-Note that the {cmd:ppp1} command requires Stata 10.1 or later versions.
+{p 12 12  2}
+lrn2+: - The likelihood ratio for negative results of the next test for the previous positives.
 
-{p 4 12 2}
-The options are,
+{p 12 12  2}
+lrp2-: - The likelihood ratio for positive results of the next test for the previous negatives.
 
-{p 4 12 2}
-{cmd:bands(numlist)} A list specifying where the different bands appear. 
-The numbers should be between 0 and 1.
+{p 12 12  2}
+lrn2-: - The likelihood ratio for negative results of the next test for the previous negatives.
 
-{p 4 12 2}
-{cmd:bandcolor(string)} Specify the colour of the bands. 
+{p 12 12  2}
+With the option {cmd:nolr}, the conditional sensitivity and specificity for the positive and outcomes should be supplied i.e  {cmd: sensitivity2+ specificity2+ sensitivity2- specificity2-} 
 
-{p 4 12 2}
-{cmd:noLR(#)} Use LR+ and LR- to compute the post-probability (default) or sensitivity and specificity.
+{pstd}
+Special values:
 
-{p 4 12 2}
-{cmd:dp(#)} Controls the decimal places. The default is 2 decimal places.
+{p 12 16 2}
+In lr mode, {bf:1} indicates “no sequential test” on that branch (connecting arrow shown in grey) i.e. 
+when the next triage is done only on positive or negative outcomes. e.g. {cmd: lrp2+ lrn2+}{cmd: 1 1} or {cmd: 1 1}{cmd: lrp2- lrn2-} respectively.
 
-{p 4 12 2}
-{cmd:legendopts(string)} Controls the legend. legendopts(on) imposes my customisation. Giving no options or legends(all) shows all the keys and their labels.
-legendopts(off) turns on the legend. 
+{p 12 16 2}
+In {cmd:nolr} mode, {bf:0.5} indicates “no sequential test” (connecting arrow shown in grey).
 
-{p 4 12 2}
-{cmd: nocompress} allow holes in the legend
+{p 12 16 2} 
+Missing values (.) hide the corresponding arrow completely. e.g. {cmd: lrp2+ lrn2+}{cmd: . .} 
 
-{p 4 12 2}
-{cmd: skip(1|2)} skip lines to have a broader graph. Useful when going to combine graphs with unequal triages.
-
-{p 4 12 2}
-{cmd: options} allow other two way graph options e.g xsize(3) ysize(7)
-
+{title: Options}
+{synoptset 20}
+{synopt:{opt bands(numlist)}}A list specifying where the different bands appear. The numbers should be between 0 and 1.{p_end}
+{synopt:{opt bandcolor(string)}}Specifies the colour of the bands. {p_end}
+{synopt:{opt noLR}}Notifies the procedure to expect sensitivity and specificity as input instead of the LR+ and LR-.{p_end}
+{synopt:{opt dp(#)}}Decimal places for annotation labels (default: 2).{p_end}
+{synopt:{opt legendopts(str)}}Control legend display. {cmd:legendopts(on)} uses custom layout, {cmd:legendopts(off)} suppresses legend. Giving no options or {cmd:legends(all)} shows all the keys and their labels. {p_end}
+{synopt:{opt skip(#)}}Skip vertical spacing between triages and rows in the legend, useful for combining graphs with different numbers of tests.{p_end}
+{synopt:{opt options}}allow other two way graph options e.g xsize(3) ysize(7).{p_end}
 
 {title:Examples}
 
-One triage with a white graph region.
-{cmd:ppp 0.5 14.4 0.25, graphregion(color(white)) legendopts(on)}
-{it:({stata "ppp 0.5 14.4 0.25, graphregion(color(white)) legendopts(on)":click to run})}
+{pstd}
+One test.
 
-One triage with regions and enlarged axis titles.
+{pmore}
+{cmd:ppp 0.5 14.4 0.25,  legendopts(on)}
+{it:({stata "ppp 0.5 14.4 0.25, legendopts(on)":click to run})}
+
+{pstd}
+One test with enlarged axis titles.
+
+{pmore}
 {cmd:ppp 0.5 14.4 0.25, bands(0.3 0.6)  ytitle(,size(5) axis(1)) ytitle(,size(5) axis(2)) legendopts(on)}
 {it:({stata "ppp 0.5 14.4 0.25, bands(0.3 0.6)  ytitle(,size(5) axis(1)) ytitle(,size(5) axis(2)) legendopts(on)":click to run})}
 
-Double triage with regions where second triage is on the negative outcomes only.
+{pstd}
+Two tests, second applied only to negatives
+
+{pmore}
 {cmd:ppp 0.5 14.4 0.45 1 1 10 0.05, bands(0.3 0.6) legendopts(on)}
 {it:({stata "ppp 0.5 14.4 0.45 1 1 10 0.05, bands(0.3 0.6) legendopts(on)":click to run})}
 
-Double triage with regions where second triage is on the positive outcomes only.
+{pstd}
+Two tests, second applied only to positives
+
+{pmore}
 {cmd:ppp 0.5 1.5 0.25 10 0.05 1 1 , bands(0.3 0.6) legendopts(on)}
 {it:({stata "ppp 0.5 1.5 0.25 10 0.05 1 1 , bands(0.3 0.6) legendopts(on)":click to run})}
 
-Double triage with regions where second triage is on the positive outcomes only when sensitivity and specificity are supplied.
+{pstd}
+Two tests, hide the negative branch of the second test
+
+{pmore}
+{cmd:ppp 0.5 1.5 0.25 10 0.05 . . , bands(0.3 0.6) legendopts(on)}
+{it:({stata "ppp 0.5 1.5 0.25 10 0.05 . . , bands(0.3 0.6) legendopts(on)":click to run})}
+
+{pstd}
+Two tests, second applied only to positives, sensitivity and specificity as input.
+
+{pmore}
 {cmd:ppp 0.5 0.9 0.6 0.9 0.6, bands(0.3 0.6) nolr legendopts(on)}
 {it:({stata "ppp 0.5 0.9 0.6 0.9 0.6, bands(0.3 0.6) nolr legendopts(on)":click to run})}
 
-Triple triage with regions (example one).
+{pstd}
+Three tests with legend.
+
+{pmore}
 {cmd:ppp 0.5 14.4 0.35 11 0.05 1 1 1 1 10 0.05 1 1, bands(0.3 0.6 ) bandcolor(blue*0.3 brown*0.3 red*0.3) legendopts(on)}
 {it:({stata "ppp 0.5 14.4 0.35 11 0.05 1 1 1 1 10 0.05 1 1, bands(0.3 0.6) bandcolor(blue*0.3 brown*0.3 red*0.3) legendopts(on)":click to run})}
 
-Triple triage with regions without legend (example two).
+{pstd}
+Three tests without legend.
+
+{pmore}
 {cmd:ppp 0.5 14.4 0.35 11 0.05 1 1 1 1 10 0.05 1 1, bands(0.3 0.6 ) bandcolor( green*0.3 orange*0.3 red*0.3) legendopts(off)}
 {it:({stata "ppp 0.5 14.4 0.35 11 0.05 1 1 1 1 10 0.05 1 1, bands(0.3 0.6) bandcolor( green*0.3 orange*0.3 red*0.3) legendopts(off)":click to run})}
 
-
-{title:Authors}
-
-{p 4 4 2}
-Victoria Nyaga 
-Unit of Cancer Epidemiology,
-Sciensano,
-Juliette Wytsmanstreet 14, B1050 Brussels,
-Belgium.
+{title:Author}
+{pmore}
+Victoria N. Nyaga ({it:Victoria.NyawiraNyaga@sciensano.be}) {p_end}
+{pmore}
+Belgian Cancer Center/Unit of Cancer Epidemiology, {p_end}
+{pmore}
+Sciensano,{p_end}
+{pmore} 
+Juliette Wytsmanstraat 14, {p_end}
+{pmore}
+B1050 Brussels, {p_end}
+{pmore}
+Belgium.{p_end}
 
 {title:Also see}
 

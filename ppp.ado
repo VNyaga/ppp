@@ -1,15 +1,15 @@
-*! Refactored version: ppp v2.00 (2025-08-20)
-*! Upto to 5 colourbands and 5 triages
+*! Refactored version: ppp v2.02 (2025-08-25)
+*No limits on columns and risk bands
 cap program drop ppp
 program define ppp
     version 10.1
 
     syntax anything [if] [in], [bands(string) bandcolor(string) noLR ///
         LEGENDopts(string asis) YSIZE(integer 6) XSIZE(integer 4) ///
-        dp(string) noCOMPress skip(integer 0) * ]
+        dp(string) skip(integer 0) * ]
 
     tempname lprev 
-	tempvar x
+    tempvar x
     qui {
         local k: word count `anything'
         tokenize `anything'
@@ -18,134 +18,108 @@ program define ppp
             di as err "At least 3 arguments required (prev, LR+, LR−)"
             exit 198
         }
-
-        if `k' > 63 {
-            di as err "Maximum of 63 arguments (5 triages) allowed"
-            exit 198
-        }
-		
-		// decimals
         if "`dp'" == "" local dp 2
-		
-		// logit limits for y-scale & guide lines
-		local maxl = log(99.9/(100-99.9))
-		local minl = log(0.01/(100-0.01))
-		
+
+        local maxl = log(99.9/(100-99.9))
+        local minl = log(0.01/(100-0.01))
+
         scalar `lprev' = log(`1' / (1 - `1'))
-		
-		*Prior: Node 0: root node
-        local lpostprob0 = log(`1' / (1 - `1'))
-        local postprob0 = 100*`1'
-        local notepost0: di "(" %4.`dp'f `postprob0' "%)"
-		local path0 = "Start"
-		
-		local segment =  `""'
-		local vertikal =  `""'
+        local lpostprob1 = log(`1' / (1 - `1'))
+        local postprob1 = 100*`1'
+        local notepost1: di "(" %4.`dp'f `postprob1' "%)"
+        local path1 = "Start"
 
-        * Setup binary tree for up to 5 triages (2^5 = 32 paths)
-        local max_depth = floor(ln(`k' - 1)/ln(2))
+        local segment = `""'
+        local vertikal = `""'
 
-		* Pre-compute x positions for each depth level
-		forvalues d = 0/`max_depth' {
-			if `d' == 0 {
-				local xpos0 = 0
-			}
-			else {
-				local xpos`d' = `= 4 * `d' + 4*`skip''
-			}
-		}
-		* Compute values for each child
-        forvalues i = 1/`= `k' - 1'  {
-            local parent = floor((`i' - 1) / 2)
-			local param_idx = `i' + 1
-			if `param_idx' > `k' continue
+        local max_depth = floor(log(`k') / log(2))
 
-            if mod(`i',2) == 1 {
-                * Left child/Odd index = LR+
-                if "`lr'" == "" {
-                    local plr = ``param_idx''
-                }
-                else {
-                    * Convert Se/Sp to LR+
-					if `param_idx' + 1 > `k' continue 
-                    local Se = ``param_idx''
-                    local Sp = ``=`param_idx' + 1''
-                    local plr = `Se' / (1 - `Sp')
-                }
-				
-                local lpostprob`i' = `lpostprob`parent'' + log(`plr')
-				local path`i' = "`path`parent''->P"
-				local color`i' "red"
+        forvalues d = 0/`max_depth' {
+            if `d' == 0 {
+                local xpos0 = 0
             }
             else {
-                * Rightchild/Even index = LR−
+                local xpos`d' = `= 4 * `d' + 4*`skip''
+            }
+        }
+
+        forvalues i = 2/`k' {
+            local parent = floor((`i' - 2) / 2) + 1
+            local param_idx = `i'
+
+            if mod(`i',2) == 0 {
+                * LR+
                 if "`lr'" == "" {
-                    local nlr = ``param_idx''
+                    local plr = ``i''
                 }
                 else {
-                    * Convert Se/Sp to LR−
-                    local Se = ``=`param_idx'-1''
-                    local Sp = ``param_idx''
+                    if `i' + 1 > `k' continue
+                    local Se = ``i''
+                    local Sp = ``=`i'+1''
+                    local plr = `Se' / (1 - `Sp')
+                }
+                local lpostprob`i' = `lpostprob`parent'' + log(`plr')
+                local path`i' = "`path`parent''->P"
+                local color`i' "red"
+            }
+            else {
+                * LR−
+                if "`lr'" == "" {
+                    local nlr = ``i''
+                }
+                else {
+                    if `i' - 1 < 2 continue
+                    local Se = ``=`i'-1''
+                    local Sp = ``i''
                     local nlr = (1 - `Se') / `Sp'
                 }
-				
                 local lpostprob`i' = `lpostprob`parent'' + log(`nlr')
-				local path`i' = "`path`parent''->N"
-				local color`i' "green"
+                local path`i' = "`path`parent''->N"
+                local color`i' "green"
             }
+
             local postprob`i' = 100*invlogit(`lpostprob`i'')
             local notepost`i': di "(" %4.`dp'f `postprob`i'' "%)"
-			local label = "Post`i': `notepost`i''"
 			
-			
-			 // neutral color when user passes 1 (LR mode) or 0.5 (noLR mode) to indicate "no test" at this branch
-            if ("`lr'" == "" & "``param_idx''" == "1") | ("`lr'" != "" & "``param_idx''" == "0.5") local color`i' "gs5"
+			//neutral point
+            if ("`lr'" == "" & "``i''" == "1") | ("`lr'" != "" & inlist("``i''", ".5", "0.5")) local color`i' "gs5"
         }
-		
-        * Generate plot commands (arrows)
-        forvalues i = 1/`= `k' - 1'  {
-			local parent = floor((`i' - 1)/2)
-			local col = "`color`i''"
-            local level_parent = floor(log(`parent' + 1)/log(2))
-			local level_child = floor(log(`i' + 1)/log(2))
-			local x0 = `xpos`level_parent''
-			local x1 = `xpos`level_child''
-			
-			* line pattern: solid for first triage (level 1), dashed deeper
-			local lpat = cond(`level_child' == 1, "solid", "dash")
+
+        forvalues i = 2/`k' {
+            local parent = floor((`i' - 2)/2) + 1
+            local col = "`color`i''"
+            local level_parent = floor(log(`parent') / log(2))
+            local level_child  = floor(log(`i') / log(2))
+            local x0 = `xpos`level_parent''
+            local x1 = `xpos`level_child''
+            local lpat = cond(`level_child' == 1, "solid", "dash")
 
             local segment `"`segment' (pcarrowi `lpostprob`parent'' `x0' `lpostprob`i'' `x1', lcolor(`col') mcolor(`col') yaxis(2) lpat(`lpat') lwidth(thin))"'
-		}
-		
-        * Y-axis labels (probability scale)
+        }
+
         local ylab ""
         foreach p in 0.01 0.05 0.1 0.5 1 2 5 10 20 50 80 90 95 99 99.5 99.9 {
-            local ylab `"`ylab' `=log(`p' / (100 - `p'))' "`p'" "'
+            local ylab `"`ylab' `=log(`p' / (100 - `p'))' "`p'" "' 
         }
-		
-		* Vertical guide lines for each depth level > 0
-		forvalues d = 1/`=`max_depth'-1' {
-			local vertikal = "`vertikal' (pci `minl' `xpos`d'' `maxl' `xpos`d'', recast(pcspike) lcolor(gs5) plotregion(margin(zero)))"
-		}
-		
-        * Plot bands if specified
+
+        forvalues d = 1/`=`max_depth'-1' {
+            local vertikal = "`vertikal' (pci `minl' `xpos`d'' `maxl' `xpos`d'', recast(pcspike) lcolor(gs5) plotregion(margin(zero)))"
+        }
+
         local area ""
         if "`bands'" != "" {
             local countbands = wordcount("`bands'")
-            if `countbands' > 4 {
-                di as err "Maximum of 5 bands supported"
-                exit 198
-            }
+
             if "`bandcolor'" == "" {
-				if `countbands' == 2 local bandcolor = "green*0.3 orange*0.3 red*0.3"
-				if `countbands' == 3 local bandcolor = "blue*0.3 green*0.3 orange*0.3 red*0.3"
-				if `countbands' == 4 local bandcolor = "blue*0.3 green*0.3 orange*0.3 brown*0.3 red*0.3"
+                if `countbands' == 2 local bandcolor = "green*0.3 orange*0.3 red*0.3"
+                if `countbands' == 3 local bandcolor = "blue*0.3 green*0.3 orange*0.3 red*0.3"
+                if `countbands' == 4 local bandcolor = "blue*0.3 green*0.3 orange*0.3 brown*0.3 red*0.3"
             }
-			
+
             local countzones = `countbands' + 1
             set obs `=`max_depth'*4 + 1'
             gen `x' = .
-            replace `x' = _n-1
+            replace `x' = _n - 1
             forvalues i = 1/`countzones' {
                 tempname upbound`i'
                 if `i' == 1 {
@@ -155,7 +129,7 @@ program define ppp
                     local val = word("`bands'", `=`i'-1')
                     local low = log(`val' / (1 - `val'))
                 }
-				
+
                 if `i' == `countzones' {
                     gen `upbound`i'' = log(99.9 / (100 - 99.9))
                 }
@@ -167,144 +141,61 @@ program define ppp
                 local area `area' (area `upbound`i'' `x', color(`col') base(`low'))
             }
         }
-		
-if `"`legendopts'"' == "on" {
-    local legendopts
 
-    local bands_plots = cond("`bands'" == "", 0, wordcount("`bands'") + 1)
-    local offset = `bands_plots'
-    local branches = `k' - 1
-    local ncols = `max_depth' + 1
-
-    * Initialize columns and fill counters
-    forvalues C = 1/`ncols' {
-        local col`C' ""
-        local filled`C' = 0
-    }
-
-    * --- Column 1: Pre-test ---
-    local p_pre = `offset' + 1
-    local col1 `"`p_pre' "Pre" `"`notepost0'"'"'
-    local filled1 = 1
-
-    * --- Depth 1: Nodes i = 1, 2 in col2 ---
-    local C = 2
-    local idx_in_col = 0
-    forvalues i = 1/2 {
-        if `i' > `branches' continue
-        local sign = cond(mod(`i', 2), "+", "-")
-        local p    = `offset' + `i' + `max_depth'
-        local note = `"`notepost`i''"'
-        local lr_val = "``=`i'+1''"
-        local is_neutral = ("`lr'" == "" & "`lr_val'" == "1") | ("`lr'" != "" & "`lr_val'" == "0.5")
-
-        if "`note'" != "" & !`is_neutral' {
-            local ++idx_in_col
-            if "`compress'" != "" & `idx_in_col' == 2 {
-                local shift = max(0, `ncols' - `C')
-                forvalues s = 1/`shift' {
-                    local col`C' `"`col`C'' - " " " " "'  // visual stagger
-                    local ++filled`C'
+        if `"`legendopts'"' == "on" {
+            local legendopts
+            local bands_plots = cond("`bands'" == "", 0, wordcount("`bands'") + 1)
+            local branches = `k' - 1
+            local ncols = `max_depth' + 1
+			local blank = `" - " " " " "'
+            forvalues coli=1/`ncols' {
+                
+				if `coli' > 1 {
+					local offset = `bands_plots' + `max_depth' - 1
+					}
+				else {
+					local offset = `bands_plots' 
+				}
+                forvalue key = `=2^(`coli' - 1)'/`=(2^`coli' - 1)' {				
+					if ("`lr'" == "" & "``key''" == "1") | ("`lr'" != "" & inlist("``key''", ".5", "0.5")) | ("``key''" == ".") | ("``key''" == "") {
+						local addblank 1
+						local note 
+					}
+					else {
+						local addblank 0
+						local note `" `=`key' + `offset''  "Post(`sign')" "`notepost`key''" "'
+					}
+                    local sign = cond(mod(`key', 2), "+", "-")
+                    local blanks = `"`blank'"'*`=(2^(`ncols' - `coli') - 1 + `addblank')'
+                    local legendorder = `" `legendorder' `note' `blanks'"'
                 }
+				if `skip' > 0 {
+					local skipped = `"`blank'"'*`skip'
+					local legendorder = `" `legendorder' `skipped'"'
+				}
             }
-            local col`C' `"`col`C'' `p' "Post(`sign')" `"`note'"'"'
+            local legendopts `"order(`legendorder') pos(6) colf col(`ncols') rowgap(1) colgap(20) region(lcolor(none))"'
         }
-        else {
-            local col`C' `"`col`C'' - " " " " "'  // blank for neutral
-        }
-        local ++filled`C'
-    }
 
-    * --- Depths ≥ 2: Auto-scaled across columns ---
-    forvalues d = 2/`max_depth' {
-        local start = 2^`d' - 1
-        local end   = min(2^(`d'+1) - 2, `branches')
-        local C     = `d' + 1
-        local idx_in_col = 0
-
-        forvalues i = `start'/`end' {
-            local sign = cond(mod(`i', 2), "+", "-")
-            local p    = `offset' + `i' + `max_depth'
-            local note = `"`notepost`i''"'
-            local lr_val = "``=`i'+1''"
-            local is_neutral = ("`lr'" == "" & "`lr_val'" == "1") | ("`lr'" != "" & "`lr_val'" == "0.5") | "`lr_val'" == "."
-
-            if "`note'" != "" & !`is_neutral' {
-                local ++idx_in_col
-                if "`compress'" != "" & `idx_in_col' == 2 {
-                    local shift = max(0, `ncols' - `C')
-                    forvalues s = 1/`shift' {
-                        local col`C' `"`col`C'' - " " " " "'
-                        local ++filled`C'
-                    }
-                }
-                local col`C' `"`col`C'' `p' "Post(`sign')" `"`note'"'"'
-            }
-            else {
-                local col`C' `"`col`C'' - " " " " "'
-            }
-            local ++filled`C'
-        }
-    }
-
-    * --- Determine required rows ---
-    local rows = 0
-    forvalues C = 1/`ncols' {
-        local rows = max(`rows', `filled`C'')
-    }
-	
-	* --- Add skip rows ---
-	local rows = `rows' + `skip'
-
-	* --- Pad each column to final row count ---
-	forvalues C = 1/`ncols' {
-		local pad`C' = `= `rows' - `filled`C'''
-		forvalues r = 1/`pad`C'' {
-			local col`C' `"`col`C'' - " " " " "'  // visual blank row
-		}
-	}
-
-    * --- Assemble order ---
-    local legend_order ""
-    forvalues C = 1/`ncols' {
-        if `"`col`C''"' != "" {
-            local legend_order `"`legend_order' `col`C''"'
-        }
-    }
-
-    * --- Final legend ---
-    local legend_defaults `"pos(6) colf col(`ncols') rowgap(2) colgap(20) region(lcolor(none))"'
-    local legendopts `"order(`legend_order') `legend_defaults'"'
-    
-}
-
-       * Draw full graph
-		#delimit;
+        #delimit;
         twoway 
-			/*Zones*/
-			`area' 
-			
-			/*scatter for the pre-test probability*/
-			(scatteri `lpostprob0' 0, 
-				msym(D) mcolor(black) xlab(none, axis(1))
-				xlab(none, axis(2))
-				xtitle(" ", axis(1))
-				xtitle(" ", axis(2))
-				xaxis(1 2)
-				ylab(`ylab', angle(0) tpos(cross) nogrid axis(1))
-				ylab(`ylab', angle(0) tpos(cross) nogrid axis(2)) 
-				yscale(axis(1)) yscale(axis(2))) 
-				
-			/*Arrows*/
-			`segment' 
-			
-			`vertikal', 
-			ytitle("Post-test Probability (%)", axis(2) placement(0)) 
-			ytitle("Pre-test Probability (%)", axis(1) placement(9)  margin(l=-5 r=3)) 
-			graphregion(color(white) margin(l=5 r=8)) 
-			xsize(`xsize') ysize(`ysize') `options' legend(`legendopts')
-		; 
-		#delimit cr
+            `area' 
+            (scatteri `lpostprob1' 0, 
+                msym(D) mcolor(black) xlab(none, axis(1))
+                xlab(none, axis(2))
+                xtitle(" ", axis(1))
+                xtitle(" ", axis(2))
+                xaxis(1 2)
+                ylab(`ylab', angle(0) tpos(cross) nogrid axis(1))
+                ylab(`ylab', angle(0) tpos(cross) nogrid axis(2)) 
+                yscale(axis(1)) yscale(axis(2))) 
+            `segment' 
+            `vertikal', 
+            ytitle("Post-test Probability (%)", axis(2) placement(0)) 
+            ytitle("Pre-test Probability (%)", axis(1) placement(9) margin(l=-5 r=3)) 
+            graphregion(color(white) margin(l=5 r=8)) 
+            xsize(`xsize') ysize(`ysize') `options' legend(`legendopts')
+        ;
+        #delimit cr
     }
 end
-
