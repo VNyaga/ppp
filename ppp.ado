@@ -117,7 +117,9 @@ program define ppp
             }
 
             local countzones = `countbands' + 1
-            set obs `=`max_depth'*4 + 1'
+			preserve
+			clear
+            set obs `=`max_depth'*4 + 1 + 4*`skip''
             gen `x' = .
             replace `x' = _n - 1
             forvalues i = 1/`countzones' {
@@ -197,5 +199,6 @@ program define ppp
             xsize(`xsize') ysize(`ysize') `options' legend(`legendopts')
         ;
         #delimit cr
+		restore
     }
 end
