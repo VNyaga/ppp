@@ -11,5 +11,5 @@ ssc install ppp
 
 To install the development version directly, type
 ```
-net install metapreg, from("https://raw.githubusercontent.com/VNyaga/ppp/master/")
+net install ppp, from("https://raw.githubusercontent.com/VNyaga/ppp/master/")
 ```
